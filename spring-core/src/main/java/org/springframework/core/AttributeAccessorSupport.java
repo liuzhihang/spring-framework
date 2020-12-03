@@ -16,13 +16,13 @@
 
 package org.springframework.core;
 
-import java.io.Serializable;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+
+import java.io.Serializable;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Support class for {@link AttributeAccessor AttributeAccessors}, providing
@@ -38,6 +38,9 @@ import org.springframework.util.StringUtils;
 public abstract class AttributeAccessorSupport implements AttributeAccessor, Serializable {
 
 	/** Map with String keys and Object values. */
+	/**
+	 * 用 Map 存储 属性
+	 */
 	private final Map<String, Object> attributes = new LinkedHashMap<>();
 
 
@@ -46,8 +49,7 @@ public abstract class AttributeAccessorSupport implements AttributeAccessor, Ser
 		Assert.notNull(name, "Name must not be null");
 		if (value != null) {
 			this.attributes.put(name, value);
-		}
-		else {
+		} else {
 			removeAttribute(name);
 		}
 	}
