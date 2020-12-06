@@ -16,17 +16,8 @@
 
 package org.springframework.context.annotation;
 
-import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
 import org.springframework.beans.factory.annotation.Lookup;
@@ -52,13 +43,13 @@ import org.springframework.core.type.filter.AnnotationTypeFilter;
 import org.springframework.core.type.filter.AssignableTypeFilter;
 import org.springframework.core.type.filter.TypeFilter;
 import org.springframework.lang.Nullable;
-import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Controller;
-import org.springframework.stereotype.Indexed;
-import org.springframework.stereotype.Repository;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.*;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
+
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.util.*;
 
 /**
  * A component provider that provides candidate components from a base package. Can
@@ -88,33 +79,54 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 
 	static final String DEFAULT_RESOURCE_PATTERN = "**/*.class";
 
-
 	protected final Log logger = LogFactory.getLog(getClass());
 
 	private String resourcePattern = DEFAULT_RESOURCE_PATTERN;
 
+	/**
+	 * 满足过滤规则的
+	 */
 	private final List<TypeFilter> includeFilters = new ArrayList<>();
 
+	/**
+	 * 需要排除的
+	 */
 	private final List<TypeFilter> excludeFilters = new ArrayList<>();
 
+	/**
+	 * 环境信息
+	 */
 	@Nullable
 	private Environment environment;
 
+	/**
+	 * 条件信息 @Conditional
+	 */
 	@Nullable
 	private ConditionEvaluator conditionEvaluator;
 
+	/**
+	 * 解析 Resource
+	 */
 	@Nullable
 	private ResourcePatternResolver resourcePatternResolver;
 
+	/**
+	 * 用于解析资源信息对应的元数据
+	 */
 	@Nullable
 	private MetadataReaderFactory metadataReaderFactory;
 
+	/**
+	 * 解析 @Index 注解
+	 */
 	@Nullable
 	private CandidateComponentsIndex componentsIndex;
 
 
 	/**
 	 * Protected constructor for flexible subclass initialization.
+	 *
 	 * @since 4.3.6
 	 */
 	protected ClassPathScanningCandidateComponentProvider() {
@@ -203,22 +215,24 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 	 */
 	@SuppressWarnings("unchecked")
 	protected void registerDefaultFilters() {
+		// 注册过滤器 添加 @Component
+		// @Controller @Service  @Repository 也会被扫描
 		this.includeFilters.add(new AnnotationTypeFilter(Component.class));
 		ClassLoader cl = ClassPathScanningCandidateComponentProvider.class.getClassLoader();
 		try {
+			// 扫描 JSR-250 @ManagedBean
 			this.includeFilters.add(new AnnotationTypeFilter(
 					((Class<? extends Annotation>) ClassUtils.forName("javax.annotation.ManagedBean", cl)), false));
 			logger.trace("JSR-250 'javax.annotation.ManagedBean' found and supported for component scanning");
-		}
-		catch (ClassNotFoundException ex) {
+		} catch (ClassNotFoundException ex) {
 			// JSR-250 1.1 API (as included in Java EE 6) not available - simply skip.
 		}
 		try {
+			// 扫描 JSR-330 @Named
 			this.includeFilters.add(new AnnotationTypeFilter(
 					((Class<? extends Annotation>) ClassUtils.forName("javax.inject.Named", cl)), false));
 			logger.trace("JSR-330 'javax.inject.Named' annotation found and supported for component scanning");
-		}
-		catch (ClassNotFoundException ex) {
+		} catch (ClassNotFoundException ex) {
 			// JSR-330 API not available - simply skip.
 		}
 	}
