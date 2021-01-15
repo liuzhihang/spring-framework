@@ -16,26 +16,15 @@
 
 package org.springframework.beans.factory.support;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.springframework.beans.factory.BeanCreationException;
-import org.springframework.beans.factory.BeanCreationNotAllowedException;
-import org.springframework.beans.factory.BeanCurrentlyInCreationException;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.ObjectFactory;
+import org.springframework.beans.factory.*;
 import org.springframework.beans.factory.config.SingletonBeanRegistry;
 import org.springframework.core.SimpleAliasRegistry;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Generic registry for shared bean instances, implementing the
@@ -150,9 +139,17 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 * resolve circular references.
 	 * @param beanName the name of the bean
 	 * @param singletonFactory the factory for the singleton object
+	 *
+	 * 如有必要，添加给定的单例工厂以构建指定的单例。
+	 * singletonFactory 是通过 Object bean = instanceWrapper.getWrappedInstance(); 获得
+	 * 如果 Bean 有后置处理器 在 getEarlyBeanReference 这一步 会执行后置处理器
 	 */
 	protected void addSingletonFactory(String beanName, ObjectFactory<?> singletonFactory) {
 		Assert.notNull(singletonFactory, "Singleton factory must not be null");
+
+		// 将 singletonFactory 如果不在 singletonObjects 中
+		// 则放到  singletonFactories 缓存中
+		// 然后从 earlySingletonObjects 移除
 		synchronized (this.singletonObjects) {
 			if (!this.singletonObjects.containsKey(beanName)) {
 				this.singletonFactories.put(beanName, singletonFactory);
@@ -175,24 +172,39 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 * @param beanName the name of the bean to look for
 	 * @param allowEarlyReference whether early references should be created or not
 	 * @return the registered singleton object, or {@code null} if none found
+	 *
+	 * 返回以给定名称注册的（原始）单例对象。
+	 *
+	 * 检查已经实例化的单例，并允许早期引用当前创建的单例（解析循环引用）
 	 */
 	@Nullable
 	protected Object getSingleton(String beanName, boolean allowEarlyReference) {
 		// Quick check for existing instance without full singleton lock
+		// private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
+		// 缓存了 单例 Bean
 		Object singletonObject = this.singletonObjects.get(beanName);
+		// 如果没有获取到, 并且当前 Bean 正在被创建中
 		if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
+			// private final Map<String, Object> earlySingletonObjects = new ConcurrentHashMap<>(16);
+			// 早期的单例对象, 先从 earlySingletonObjects 中获取
 			singletonObject = this.earlySingletonObjects.get(beanName);
+			// 没有从 earlySingletonObjects 缓存中获取到
 			if (singletonObject == null && allowEarlyReference) {
 				synchronized (this.singletonObjects) {
 					// Consistent creation of early reference within full singleton lock
+					// 再次获取并检查
 					singletonObject = this.singletonObjects.get(beanName);
 					if (singletonObject == null) {
 						singletonObject = this.earlySingletonObjects.get(beanName);
 						if (singletonObject == null) {
+							// private final Map<String, ObjectFactory<?>> singletonFactories = new HashMap<>(16);
+							// 从 singletonFactories 缓存中获取
 							ObjectFactory<?> singletonFactory = this.singletonFactories.get(beanName);
 							if (singletonFactory != null) {
 								singletonObject = singletonFactory.getObject();
+								// 添加到 earlySingletonObjects 缓存中
 								this.earlySingletonObjects.put(beanName, singletonObject);
+								// 从 singletonFactories 缓存中删除
 								this.singletonFactories.remove(beanName);
 							}
 						}
@@ -213,17 +225,21 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 */
 	public Object getSingleton(String beanName, ObjectFactory<?> singletonFactory) {
 		Assert.notNull(beanName, "Bean name must not be null");
+		// 加锁
 		synchronized (this.singletonObjects) {
+			// 检查 singletonObjects 缓存中是否有
 			Object singletonObject = this.singletonObjects.get(beanName);
 			if (singletonObject == null) {
+				// 检查是否在执行销毁
 				if (this.singletonsCurrentlyInDestruction) {
 					throw new BeanCreationNotAllowedException(beanName,
 							"Singleton bean creation not allowed while singletons of this factory are in destruction " +
-							"(Do not request a bean from a BeanFactory in a destroy method implementation!)");
+									"(Do not request a bean from a BeanFactory in a destroy method implementation!)");
 				}
 				if (logger.isDebugEnabled()) {
 					logger.debug("Creating shared instance of singleton bean '" + beanName + "'");
 				}
+				// 将 Bean 添加到 singletonsCurrentlyInCreation 集合中, 表示正在创建
 				beforeSingletonCreation(beanName);
 				boolean newSingleton = false;
 				boolean recordSuppressedExceptions = (this.suppressedExceptions == null);
@@ -231,6 +247,8 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					this.suppressedExceptions = new LinkedHashSet<>();
 				}
 				try {
+					// 调用工厂方法
+					// 也就是调用 createBean(beanName, mbd, args)
 					singletonObject = singletonFactory.getObject();
 					newSingleton = true;
 				}
@@ -254,9 +272,15 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					if (recordSuppressedExceptions) {
 						this.suppressedExceptions = null;
 					}
+					// 创建成功, 从 singletonsCurrentlyInCreation 移除
 					afterSingletonCreation(beanName);
 				}
 				if (newSingleton) {
+					// 将给定的单例对象添加到该工厂的单例缓存中
+					// 	this.singletonObjects.put(beanName, singletonObject);
+					// 	this.singletonFactories.remove(beanName);
+					// 	this.earlySingletonObjects.remove(beanName);
+					// 	this.registeredSingletons.add(beanName);
 					addSingleton(beanName, singletonObject);
 				}
 			}

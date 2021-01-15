@@ -67,17 +67,23 @@ final class PostProcessorRegistrationDelegate {
 		if (beanFactory instanceof BeanDefinitionRegistry) {
 			BeanDefinitionRegistry registry = (BeanDefinitionRegistry) beanFactory;
 
-			// 创建了两个 PostProcessor
-			// BeanDefinitionRegistryPostProcessor 还继承了 BeanFactoryPostProcessor
+			// 创建了两个 List 集合, 用来存放处理器
+			// BeanDefinitionRegistryPostProcessor 是 BeanFactoryPostProcessor 的子接口
+			// BeanDefinitionRegistryPostProcessor 还可以额外处理 BeanDefinition, 添加 BeanDefinition
+			// 用法可以参考示例
 			List<BeanFactoryPostProcessor> regularPostProcessors = new ArrayList<>();
 			List<BeanDefinitionRegistryPostProcessor> registryProcessors = new ArrayList<>();
 
-			// 循环
-			// 我这里初始是空的
+			// 循环 beanFactoryPostProcessors
+			// beanFactoryPostProcessors 是使用 API context.addBeanFactoryPostProcessor 添加进来的
 			for (BeanFactoryPostProcessor postProcessor : beanFactoryPostProcessors) {
+
+				// BeanDefinitionRegistryPostProcessor 要单独添加到 registryProcessors
 				if (postProcessor instanceof BeanDefinitionRegistryPostProcessor) {
 					BeanDefinitionRegistryPostProcessor registryProcessor =
 							(BeanDefinitionRegistryPostProcessor) postProcessor;
+
+					// 处理 Bean 的信息
 					registryProcessor.postProcessBeanDefinitionRegistry(registry);
 					registryProcessors.add(registryProcessor);
 				} else {
@@ -89,7 +95,8 @@ final class PostProcessorRegistrationDelegate {
 			// uninitialized to let the bean factory post-processors apply to them!
 			// Separate between BeanDefinitionRegistryPostProcessors that implement
 			// PriorityOrdered, Ordered, and the rest.
-			// 创建 BeanDefinitionRegistryPostProcessor 集合
+			// 上面循环是执行的我们调用 API 添加的 BeanDefinitionRegistryPostProcessor
+			// 下面执行 Spring 自己的 BeanDefinitionRegistryPostProcessor 集合
 			// 先执行实现了 PriorityOrdered接口的，然后是 Ordered 接口的，最后执行剩下的
 			List<BeanDefinitionRegistryPostProcessor> currentRegistryProcessors = new ArrayList<>();
 
@@ -161,6 +168,7 @@ final class PostProcessorRegistrationDelegate {
 			invokeBeanFactoryPostProcessors(regularPostProcessors, beanFactory);
 		} else {
 			// Invoke factory processors registered with the context instance.
+			// 不是 BeanDefinitionRegistry 则是普通 BeanFactory 直接执行 beanFactoryPostProcessors 即可
 			invokeBeanFactoryPostProcessors(beanFactoryPostProcessors, beanFactory);
 		}
 
@@ -220,16 +228,19 @@ final class PostProcessorRegistrationDelegate {
 	public static void registerBeanPostProcessors(
 			ConfigurableListableBeanFactory beanFactory, AbstractApplicationContext applicationContext) {
 
+		// 查找 BeanPostProcessor 类型的 Bean 的名称集合, 就是获取所有继承了 BeanPostProcessor 的类
 		String[] postProcessorNames = beanFactory.getBeanNamesForType(BeanPostProcessor.class, true, false);
 
 		// Register BeanPostProcessorChecker that logs an info message when
 		// a bean is created during BeanPostProcessor instantiation, i.e. when
 		// a bean is not eligible for getting processed by all BeanPostProcessors.
+		//  注册一个 BeanPostProcessorChecker，用来记录 bean 在 BeanPostProcessor 实例化时的信息。
 		int beanProcessorTargetCount = beanFactory.getBeanPostProcessorCount() + 1 + postProcessorNames.length;
 		beanFactory.addBeanPostProcessor(new BeanPostProcessorChecker(beanFactory, beanProcessorTargetCount));
 
 		// Separate between BeanPostProcessors that implement PriorityOrdered,
 		// Ordered, and the rest.
+		// 四个集合 区分实现不同接口的 BeanPostProcessors
 		List<BeanPostProcessor> priorityOrderedPostProcessors = new ArrayList<>();
 		List<BeanPostProcessor> internalPostProcessors = new ArrayList<>();
 		List<String> orderedPostProcessorNames = new ArrayList<>();
@@ -249,6 +260,7 @@ final class PostProcessorRegistrationDelegate {
 		}
 
 		// First, register the BeanPostProcessors that implement PriorityOrdered.
+		// 排序后执行 实现 PriorityOrdered 的 BeanPostProcessors
 		sortPostProcessors(priorityOrderedPostProcessors, beanFactory);
 		registerBeanPostProcessors(beanFactory, priorityOrderedPostProcessors);
 

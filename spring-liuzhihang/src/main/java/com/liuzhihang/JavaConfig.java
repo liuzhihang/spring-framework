@@ -1,7 +1,10 @@
 package com.liuzhihang;
 
+import org.springframework.context.MessageSource;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.support.ResourceBundleMessageSource;
 
 /**
  * @author liuzhihang
@@ -10,6 +13,20 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ComponentScan("com.liuzhihang")
 public class JavaConfig {
+
+
+	@Bean(name = "messageSource")
+	public MessageSource getMessageSource() {
+
+		ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+
+		messageSource.setDefaultEncoding("UTF-8");
+		messageSource.addBasenames("message", "message_en");
+
+		return messageSource;
+
+	}
+
 }
 
 
